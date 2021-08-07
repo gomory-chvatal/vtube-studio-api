@@ -13,7 +13,9 @@ def id_generator():
 
 
 class VTSRequest(object):
-    """Docstring goes here!"""
+    """Object takes request type and optional dictionary and produces JSON
+    request for VTS.
+    """
 
     next_id = id_generator()
 
@@ -54,3 +56,9 @@ class VTSRequest(object):
         if not self._send_time:
             self._send_time = int(datetime.now().timestamp()*1000)
         return json.dumps(self._payload)
+
+    def __str__(self):
+        return f'request {self._id} {self._msg_type}:\n{self._payload}'
+
+    def __repr__(self):
+        return self.__str__()
