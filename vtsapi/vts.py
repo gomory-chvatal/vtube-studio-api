@@ -16,12 +16,13 @@ from vtsapi.request import *
 class VTSSession(object):
     """Class description here!"""
 
-    def __init__(self, name, developer, icon_path=None, port=None):
+    def __init__(self, name, developer, icon_path=None, port=None, debug=False):
         
         # plugin settings
         self._plugin_name = name
         self._plugin_dev = developer
         self._plugin_icon_path = icon_path
+        self._debug = debug
 
         # vts settings
         self._api_name = 'VTubeStudioPublicAPI'
@@ -56,11 +57,30 @@ class VTSSession(object):
     # private websocket methods
     async def _ws_connect(self):
 
-        self._ws = await websockets.connect(f'ws://{self._host}:{self._port}')
+        uri = f'ws://{self._host}:{self._port}'
+        if self._debug:
+            print(f'Attempting to connect to {uri}')
+        
+        self._ws = await websockets.connect(uri)
+
+        if self._debug:
+            if self._ws.open:
+                print(f'Connected to {uri}')
+            else:
+                print(f'Unable to connect to {uri}')
+
+        # start listening for responses, this will run
+        # until the object is destroyed
+        asyncio.ensure_future(self._receive_responses())
 
     async def _ws_close(self):
         
         if self._ws and self._ws.open:
+
+            if self._debug:
+                (host, port) = self._ws.remote_address
+                print(f'Closing websocket connected to ws://{host}:{port}')
+
             await self._ws.close()
             self._ws = None
 
@@ -69,6 +89,10 @@ class VTSSession(object):
 
         async for message in self._ws:
             response = VTSResponse(message)
+
+            if self._debug:
+                print(f'received response:\n{response}')
+
             if response.id in self._request_awaiting_response:
                 del self._request_awaiting_response[response.id]
                 self._response_awaiting_processing[response.id] = response
@@ -92,6 +116,9 @@ class VTSSession(object):
         
         if track_response:
             self._request_awaiting_response[request.id] = None
+
+        if self._debug:
+            print(f'preparing to send request:\n{request}')
 
         await self._ws.send(request.json)
 
@@ -234,10 +261,6 @@ class VTSSession(object):
     
     
     # public methods
-    async def start(self):
-        
-        await self._receive_responses()
-
     async def get_state(self):
         
         response = await self._get_state()
